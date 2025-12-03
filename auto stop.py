@@ -21,7 +21,7 @@ API_KEY = "ptla_vXHi5hrHcUosQbB68PTGULuVEFmlnSZsBx6GFsTkqgz"  # Application API 
 
 # Server IPs and Ports to monitor (from your setup)
 MONITOR_IPS = ["192.168.86.45"]  # Internal IP of your game servers
-MONITOR_PORTS = ["25565", "24454", "8100", "19132"]  # Ports your game servers use
+MONITOR_PORTS = ["25565", "24454", "8100", "19132", "80", "8080", "2022"]  # Game servers + web panel ports
 
 # Game server VM SSH details (to check connections remotely)
 GAME_SERVER_VM_IP = "192.168.86.45"
