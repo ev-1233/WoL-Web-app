@@ -17,7 +17,11 @@ from datetime import datetime
 
 # Pterodactyl Panel API Configuration
 PTERODACTYL_URL = "https://panel.thethings.qzz.io"  # Your Pterodactyl Panel URL
-API_KEY = "YOUR_API_KEY_HERE"  # Application API key from Pterodactyl
+API_KEY = "ptla_vXHi5hrHcUosQbB68PTGULuVEFmlnSZsBx6GFsTkqgz"  # Application API key from Pterodactyl
+
+# Server IPs and Ports to monitor (from your setup)
+MONITOR_IPS = ["192.168.86.45"]  # Internal IP of your game servers
+MONITOR_PORTS = ["25565", "24454", "8100", "19132"]  # Ports your game servers use
 
 # Inactivity timeout in seconds (5 minutes = 300 seconds)
 INACTIVITY_TIMEOUT = 300
@@ -28,8 +32,11 @@ CHECK_INTERVAL = 60
 # Shutdown command for Proxmox
 SHUTDOWN_COMMAND = "shutdown -h now"
 
+# SSL verification (set to False if using self-signed certificate)
+VERIFY_SSL = False
+
 # Log file location (optional)
-LOG_FILE = "/var/log/auto_shutdown.log"
+LOG_FILE = "./auto_shutdown.log"
 
 # =================================================================
 #                         HELPER FUNCTIONS
@@ -60,7 +67,8 @@ def get_pterodactyl_servers():
         response = requests.get(
             f"{PTERODACTYL_URL}/api/application/servers",
             headers=headers,
-            timeout=10
+            timeout=10,
+            verify=VERIFY_SSL
         )
         response.raise_for_status()
         return response.json().get("data", [])
@@ -72,8 +80,8 @@ def get_pterodactyl_servers():
 def check_server_connections(server_id):
     """
     Check if a specific server has active connections.
-    This uses the client API to get server resource usage.
-    Returns True if players are connected, False otherwise.
+    Returns True if server is running (players might be connected), False otherwise.
+    Note: This doesn't give exact player count, just checks if server is online.
     """
     headers = {
         "Authorization": f"Bearer {API_KEY}",
@@ -86,7 +94,8 @@ def check_server_connections(server_id):
         response = requests.get(
             f"{PTERODACTYL_URL}/api/application/servers/{server_id}",
             headers=headers,
-            timeout=10
+            timeout=10,
+            verify=VERIFY_SSL
         )
         response.raise_for_status()
         server_data = response.json()
@@ -94,9 +103,9 @@ def check_server_connections(server_id):
         # Check if server is running
         server_status = server_data.get("attributes", {}).get("status", "offline")
         
-        # If server is running, check resource usage to infer activity
+        # Only count as active if server is actually running
         if server_status == "running":
-            return True  # Server is running, assume it might have users
+            return True
         
         return False
         
@@ -150,27 +159,33 @@ def check_any_active_connections():
 
 def check_network_connections():
     """
-    Alternative method: Check for active network connections on common game ports.
-    This is a fallback if API checks don't work well.
+    Check for active network connections to monitored IPs and ports.
+    This checks if anyone is connected to your game servers.
     """
     try:
-        # Check for established connections on common game server ports
+        # Check for established connections using ss (faster than netstat)
         result = subprocess.run(
-            ["netstat", "-tn"],
+            ["ss", "-tn"],
             capture_output=True,
             text=True,
             timeout=5
         )
         
-        # Common game server ports
-        game_ports = ["25565", "25566", "25567", "27015", "7777", "8080"]
+        connections_found = []
         
         for line in result.stdout.split("\n"):
-            if "ESTABLISHED" in line:
-                for port in game_ports:
-                    if f":{port}" in line:
-                        log_message(f"Active connection detected on port {port}")
-                        return True
+            if "ESTAB" in line:
+                # Check if line contains any of our monitored IPs and ports
+                for ip in MONITOR_IPS:
+                    for port in MONITOR_PORTS:
+                        # Look for the IP:PORT combination in the line
+                        if f"{ip}:{port}" in line:
+                            connections_found.append(f"{ip}:{port}")
+                            log_message(f"Active connection detected: {ip}:{port}")
+        
+        if connections_found:
+            log_message(f"Total active connections: {len(connections_found)}")
+            return True
         
         return False
         
@@ -180,15 +195,11 @@ def check_network_connections():
 
 
 def shutdown_proxmox():
-    """Execute shutdown command"""
-    log_message("INITIATING SHUTDOWN")
-    try:
-        subprocess.run(SHUTDOWN_COMMAND.split(), check=True)
-        log_message("Shutdown command executed successfully")
-    except subprocess.CalledProcessError as e:
-        log_message(f"Error executing shutdown: {e}")
-    except Exception as e:
-        log_message(f"Unexpected error during shutdown: {e}")
+    """Print shutdown message instead of actually shutting down"""
+    log_message("SHUTDOWN COMPLETE")
+    print("\n" + "="*50)
+    print("    SHUTDOWN COMPLETE")
+    print("="*50 + "\n")
 
 
 # =================================================================
@@ -199,23 +210,25 @@ def main():
     log_message("=== Auto-Shutdown Monitor Started ===")
     log_message(f"Inactivity timeout: {INACTIVITY_TIMEOUT} seconds ({INACTIVITY_TIMEOUT/60} minutes)")
     log_message(f"Check interval: {CHECK_INTERVAL} seconds")
-    log_message(f"Pterodactyl URL: {PTERODACTYL_URL}")
+    log_message(f"Monitoring IPs: {', '.join(MONITOR_IPS)}")
+    log_message(f"Monitoring Ports: {', '.join(MONITOR_PORTS)}")
     
     inactive_time = 0
     
     while True:
         try:
-            # Check for active connections
-            has_connections = check_any_active_connections()
+            # Check for active network connections (primary method)
+            has_connections = check_network_connections()
             
-            # Optional: Also check network connections as backup
-            # has_network_activity = check_network_connections()
-            # has_connections = has_connections or has_network_activity
+            # Optional: Also check Pterodactyl API if needed
+            # api_activity = check_any_active_connections()
+            # has_connections = has_connections or api_activity
             
             if has_connections:
                 # Reset timer if connections are detected
                 if inactive_time > 0:
                     log_message("Activity detected - resetting inactivity timer")
+                    print("\nNO SHUTDOWN")
                 inactive_time = 0
             else:
                 # Increment inactive time
