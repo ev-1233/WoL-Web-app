@@ -21,7 +21,7 @@ API_KEY = "ptla_vXHi5hrHcUosQbB68PTGULuVEFmlnSZsBx6GFsTkqgz"  # Application API 
 
 # Server IPs and Ports to monitor (from your setup)
 MONITOR_IPS = ["192.168.86.45"]  # Internal IP of your game servers
-MONITOR_PORTS = ["25565", "24454", "8100", "19132", "80", "8080", "2022"]  # Game servers + web panel ports
+MONITOR_PORTS = ["25565", "24454", "8100", "19132", "8080", "2022"]  # Game servers + web panel ports
 
 # Game server VM SSH details (to check connections remotely)
 GAME_SERVER_VM_IP = "192.168.86.45"
@@ -318,11 +318,18 @@ def check_java_processes():
 
 
 def shutdown_proxmox():
-    """Print shutdown message instead of actually shutting down"""
-    log_message("SHUTDOWN COMPLETE")
+    """Execute Proxmox shutdown"""
+    log_message("INITIATING PROXMOX SHUTDOWN")
     print("\n" + "="*50)
-    print("    SHUTDOWN COMPLETE")
+    print("    SHUTTING DOWN PROXMOX")
     print("="*50 + "\n")
+    try:
+        subprocess.run(["shutdown", "-h", "now"], check=True)
+        log_message("Shutdown command executed successfully")
+    except subprocess.CalledProcessError as e:
+        log_message(f"Error executing shutdown: {e}")
+    except Exception as e:
+        log_message(f"Unexpected error during shutdown: {e}")
 
 
 # =================================================================
