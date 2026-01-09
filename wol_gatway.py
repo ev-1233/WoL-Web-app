@@ -6,13 +6,13 @@ from flask import Flask, redirect, Response
 #                         USER CONFIGURATION
 # =================================================================
 
-# 1. MAC Address of the Proxmox Server's Network Card (e.g., "00:1A:2B:3C:4D:5E")
-PROXMOX_MAC_ADDRESS = "8C:EC:4B:CE:2D:B7"
+# 1. MAC Address of the Server's Network Card (e.g., "00:1A:2B:3C:4D:5E")
+WOL_MAC_ADDRESS = "8C:EC:4B:CE:2D:B7"
 
-# 2. The final URL of your Pterodactyl Panel (e.g., "http://192.168.86.25:8080")
-PANEL_URL = "https://panel.thethings.qzz.io"
+# 2. The final URL of your site (e.g., "http://panel.yourdomain.com")
+SITE_URL = "https://panel.thethings.qzz.io"
 
-# 3. Time (in seconds) to wait for the Proxmox server to boot up
+# 3. Time (in seconds) to wait for the server to boot up
 WAIT_TIME_SECONDS = 60 
 
 # =================================================================
@@ -29,7 +29,7 @@ WAITING_PAGE_HTML = f"""
 <html>
 <head>
     <title>Server Starting...</title>
-    <meta http-equiv="refresh" content="{WAIT_TIME_SECONDS};url={PANEL_URL}">
+    <meta http-equiv="refresh" content="{WAIT_TIME_SECONDS};url={SITE_URL}">
     <style>
         body {{ font-family: sans-serif; text-align: center; margin-top: 50px; background-color: #f0f0f0; }}
         .container {{ background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: inline-block; }}
@@ -57,8 +57,8 @@ def wake_server_and_redirect():
     # 1. Send the Wake-on-LAN Packet using the command-line utility
     try:
         # 'check=True' raises an error if the command fails
-        subprocess.run(['wakeonlan', PROXMOX_MAC_ADDRESS], check=True, capture_output=True)
-        print(f"[{time.strftime('%H:%M:%S')}] WOL Magic Packet sent to {PROXMOX_MAC_ADDRESS}")
+        subprocess.run(['wakeonlan', WOL_MAC_ADDRESS], check=True, capture_output=True)
+        print(f"[{time.strftime('%H:%M:%S')}] WOL Magic Packet sent to {WOL_MAC_ADDRESS}")
     
     except subprocess.CalledProcessError as e:
         error_message = f"WOL Error: Could not send packet. Check MAC address and 'wakeonlan' install: {e.stderr.decode()}"
@@ -91,5 +91,5 @@ if __name__ == '__main__':
     # 'host=0.0.0.0' allows connections from any device on your local network.
     # 'port=5000' is the default Flask port, which your router must forward to.
     print(f"[{time.strftime('%H:%M:%S')}] Flask App starting on http://0.0.0.0:5000")
-    print(f"[{time.strftime('%H:%M:%S')}] Waking MAC: {PROXMOX_MAC_ADDRESS}, Redirect URL: {PANEL_URL}")
+    print(f"[{time.strftime('%H:%M:%S')}] Waking MAC: {WOL_MAC_ADDRESS}, Redirect URL: {SITE_URL}")
     app.run(host='0.0.0.0', port=5000, debug=False)
