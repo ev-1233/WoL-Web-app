@@ -1,19 +1,54 @@
 import subprocess
 import time
+import json
+import os
 from flask import Flask, redirect, Response
 
 # =================================================================
 #                         USER CONFIGURATION
 # =================================================================
 
+CONFIG_FILE = "WOL_Brige.config"
+
+def load_config():
+    defaults = {
+        "WOL_MAC_ADDRESS": "8C:EC:4B:CE:2D:B7",
+        "SITE_URL": "https://panel.thethings.qzz.io",
+        "WAIT_TIME_SECONDS": 60
+    }
+    
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                user_config = json.load(f)
+                # Update defaults with user config, ignoring keys that might not exist in defaults if desired, 
+                # but here we just update.
+                defaults.update(user_config)
+                print(f"[{time.strftime('%H:%M:%S')}] Loaded config from {CONFIG_FILE}")
+        except json.JSONDecodeError as e:
+            print(f"[{time.strftime('%H:%M:%S')}] Error parsing {CONFIG_FILE}: {e}. Using defaults.")
+        except Exception as e:
+            print(f"[{time.strftime('%H:%M:%S')}] Error loading {CONFIG_FILE}: {e}. Using defaults.")
+    else:
+        print(f"[{time.strftime('%H:%M:%S')}] Config file {CONFIG_FILE} not found. Creating with defaults.")
+        try:
+            with open(CONFIG_FILE, 'w') as f:
+                json.dump(defaults, f, indent=4)
+        except Exception as e:
+             print(f"[{time.strftime('%H:%M:%S')}] Could not create {CONFIG_FILE}: {e}")
+
+    return defaults
+
+config = load_config()
+
 # 1. MAC Address of the Server's Network Card (e.g., "00:1A:2B:3C:4D:5E")
-WOL_MAC_ADDRESS = "8C:EC:4B:CE:2D:B7"
+WOL_MAC_ADDRESS = config["WOL_MAC_ADDRESS"]
 
 # 2. The final URL of your site (e.g., "http://panel.yourdomain.com")
-SITE_URL = "https://panel.thethings.qzz.io"
+SITE_URL = config["SITE_URL"]
 
 # 3. Time (in seconds) to wait for the server to boot up
-WAIT_TIME_SECONDS = 60 
+WAIT_TIME_SECONDS = int(config["WAIT_TIME_SECONDS"]) 
 
 # =================================================================
 #                     FLASK APPLICATION START
