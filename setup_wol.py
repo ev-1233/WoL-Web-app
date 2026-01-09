@@ -29,7 +29,7 @@ def main():
     # Defaults from current file or hardcoded fallbacks
     default_mac = current_config.get("WOL_MAC_ADDRESS", "")
     default_url = current_config.get("SITE_URL", "")
-    default_wait = current_config.get("WAIT_TIME_SECONDS", 60)
+    default_wait = current_config.get("WAIT_TIME_SECONDS")
 
     # 1. Get MAC Address
     while True:
@@ -69,21 +69,33 @@ def main():
 
     # 3. Get Wait Time
     while True:
-        prompt_wait = f"Enter Wait Time in Seconds [{default_wait}]: "
+        prompt_wait = "Enter Wait Time in Seconds"
+        if default_wait is not None:
+            prompt_wait += f" [{default_wait}]"
+        prompt_wait += ": "
+
         wait_input = input(prompt_wait).strip()
-        
+
         if not wait_input:
-            wait = default_wait
+            if default_wait is None:
+                print("Wait time is required.")
+                continue
             try:
-                wait = int(wait) # Ensure it's an int if it came from file
-            except:
-                wait = 60
-            break
-        elif wait_input.isdigit():
-            wait = int(wait_input)
-            break
+                wait = int(default_wait)
+            except Exception:
+                print("Stored wait time is invalid; please enter a number.")
+                continue
         else:
-            print("Please enter a valid integer number.")
+            try:
+                wait = int(wait_input)
+            except ValueError:
+                print("Please enter a valid integer number.")
+                continue
+
+        if wait <= 0:
+            print("Please enter a number greater than zero.")
+            continue
+        break
 
     # Save Configuration
     new_config = {

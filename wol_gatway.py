@@ -11,33 +11,47 @@ from flask import Flask, redirect, Response
 CONFIG_FILE = "WOL_Brige.config"
 
 def load_config():
-    defaults = {
-        "WOL_MAC_ADDRESS": "8C:EC:4B:CE:2D:B7",
-        "SITE_URL": "https://panel.thethings.qzz.io",
-        "WAIT_TIME_SECONDS": 60
-    }
-    
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r') as f:
-                user_config = json.load(f)
-                # Update defaults with user config, ignoring keys that might not exist in defaults if desired, 
-                # but here we just update.
-                defaults.update(user_config)
-                print(f"[{time.strftime('%H:%M:%S')}] Loaded config from {CONFIG_FILE}")
-        except json.JSONDecodeError as e:
-            print(f"[{time.strftime('%H:%M:%S')}] Error parsing {CONFIG_FILE}: {e}. Using defaults.")
-        except Exception as e:
-            print(f"[{time.strftime('%H:%M:%S')}] Error loading {CONFIG_FILE}: {e}. Using defaults.")
-    else:
-        print(f"[{time.strftime('%H:%M:%S')}] Config file {CONFIG_FILE} not found. Creating with defaults.")
-        try:
-            with open(CONFIG_FILE, 'w') as f:
-                json.dump(defaults, f, indent=4)
-        except Exception as e:
-             print(f"[{time.strftime('%H:%M:%S')}] Could not create {CONFIG_FILE}: {e}")
+    required_keys = ("WOL_MAC_ADDRESS", "SITE_URL", "WAIT_TIME_SECONDS")
 
-    return defaults
+    if not os.path.exists(CONFIG_FILE):
+        raise FileNotFoundError(
+            f"Config file {CONFIG_FILE} is required. Run setup_wol.py to create it."
+        )
+
+    try:
+        with open(CONFIG_FILE, 'r') as f:
+            user_config = json.load(f)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Error parsing {CONFIG_FILE}: {e}") from e
+
+    missing = [key for key in required_keys if key not in user_config]
+    if missing:
+        raise ValueError(f"Missing required config keys: {', '.join(missing)}")
+
+    mac = str(user_config["WOL_MAC_ADDRESS"]).strip()
+    site = str(user_config["SITE_URL"]).strip()
+    wait_raw = user_config["WAIT_TIME_SECONDS"]
+
+    if not mac:
+        raise ValueError("WOL_MAC_ADDRESS must be set in the config file.")
+    if not site:
+        raise ValueError("SITE_URL must be set in the config file.")
+
+    try:
+        wait = int(wait_raw)
+    except (TypeError, ValueError) as e:
+        raise ValueError("WAIT_TIME_SECONDS must be an integer.") from e
+
+    if wait <= 0:
+        raise ValueError("WAIT_TIME_SECONDS must be greater than zero.")
+
+    print(f"[{time.strftime('%H:%M:%S')}] Loaded config from {CONFIG_FILE}")
+
+    return {
+        "WOL_MAC_ADDRESS": mac,
+        "SITE_URL": site,
+        "WAIT_TIME_SECONDS": wait,
+    }
 
 config = load_config()
 
@@ -48,7 +62,7 @@ WOL_MAC_ADDRESS = config["WOL_MAC_ADDRESS"]
 SITE_URL = config["SITE_URL"]
 
 # 3. Time (in seconds) to wait for the server to boot up
-WAIT_TIME_SECONDS = int(config["WAIT_TIME_SECONDS"]) 
+WAIT_TIME_SECONDS = config["WAIT_TIME_SECONDS"]
 
 # =================================================================
 #                     FLASK APPLICATION START
