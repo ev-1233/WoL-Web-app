@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import platform
+import socket
 
 # Configuration file path - must match the one used by wol_gatway.py
 CONFIG_FILE = "WOL_Brige.config"
@@ -300,28 +301,167 @@ def load_current_config():
             pass
     return {}
 
+def check_docker_available():
+    """
+    Check if Docker is installed and the daemon is running.
+    
+    Returns:
+        bool: True if Docker is available and working, False otherwise
+    """
+    try:
+        # Check if docker command exists
+        result = subprocess.run(['docker', '--version'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return False
+        
+        # Check if docker daemon is running by trying to list containers
+        result = subprocess.run(['docker', 'ps'], capture_output=True, text=True)
+        return result.returncode == 0
+    except FileNotFoundError:
+        return False
+
+def get_local_ip():
+    """
+    Get the local IP address of this machine.
+    
+    Returns:
+        str: Local IP address or 'localhost' if unable to determine
+    """
+    try:
+        # Create a socket and connect to an external address (doesn't actually send data)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.1)
+        # Use Google's DNS server to determine which interface would be used
+        s.connect(('8.8.8.8', 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except Exception:
+        # Fallback: try to get hostname IP
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except Exception:
+            return 'localhost'
+
+def setup_with_docker():
+    """
+    Sets up and runs the WOL gateway using Docker.
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    print("\n" + "="*50)
+    print("      Docker Setup Mode")
+    print("="*50)
+    
+    docker_dir = os.path.join(os.path.dirname(__file__), '.docker')
+    
+    if not os.path.exists(docker_dir):
+        print("Error: .docker directory not found!")
+        return False
+    
+    print("\nBuilding Docker image...")
+    print("This may take a few minutes on first run...")
+    print("You'll see Docker's build output below:\n")
+    print("-" * 50)
+    
+    try:
+        # Build the Docker image - show output to user so they see progress
+        result = subprocess.run(
+            ['docker', 'compose', 'up', '-d', '--build'],
+            cwd=docker_dir
+            # NOT capturing output so user sees real-time progress
+        )
+        
+        print("-" * 50)
+        
+        if result.returncode == 0:
+            # Check if container is actually running
+            check_result = subprocess.run(
+                ['docker', 'compose', 'ps', '-q'],
+                cwd=docker_dir,
+                capture_output=True,
+                text=True
+            )
+            
+            if check_result.returncode == 0 and check_result.stdout.strip():
+                print("\n" + "="*50)
+                print("  ✓ Docker container started successfully!")
+                print("="*50)
+                print("\nYour WOL Gateway is now running in Docker!")
+                
+                # Get the port from config
+                try:
+                    with open(CONFIG_FILE, 'r') as f:
+                        config = json.load(f)
+                        port = config.get('PORT', 500)
+                except:
+                    port = 500
+                
+                # Get local IP address
+                local_ip = get_local_ip()
+                
+                print("\nAccess it at:")
+                print(f"  - Local:   http://localhost:{port}/wake")
+                print(f"  - Network: http://{local_ip}:{port}/wake")
+                print("\nUseful commands:")
+                print("  View logs:    cd .docker && docker compose logs -f")
+                print("  Stop:         cd .docker && docker compose down")
+                print("  Restart:      cd .docker && docker compose restart")
+                print("  Rebuild:      cd .docker && docker compose up -d --build")
+                return True
+            else:
+                print("\n✗ Container did not start properly")
+                print("Run 'cd .docker && docker compose logs' to see errors")
+                return False
+        else:
+            print("\n✗ Failed to start Docker container")
+            print("Check the error messages above")
+            return False
+            
+    except KeyboardInterrupt:
+        print("\n\n⚠ Build cancelled by user")
+        return False
+    except Exception as e:
+        print(f"\n✗ Error running Docker: {e}")
+        return False
+
 def main():
     print("====================================")
     print("      WOL Bridge Setup Script       ")
     print("====================================")
     
-    # First, check and install dependencies
-    print("\nThis script will check for required dependencies and install them if needed.")
-    print("You may be prompted for your sudo password to install system packages.\n")
+    # Check if Docker is available
+    docker_available = check_docker_available()
     
-    user_input = input("Continue with dependency check? [Y/n]: ").strip().lower()
-    if user_input and user_input not in ('y', 'yes'):
-        print("Setup cancelled.")
-        return
-    
-    # Install dependencies
-    if not install_dependencies():
-        print("\n[WARNING] Some dependencies could not be installed automatically.")
-        print("The configuration will be saved, but the gateway may not work correctly.")
-        user_input = input("\nContinue with configuration anyway? [y/N]: ").strip().lower()
-        if user_input not in ('y', 'yes'):
-            print("Setup cancelled.")
-            return
+    if docker_available:
+        print("\n✓ Docker detected and running!")
+        print("\n" + "="*50)
+        print("  Deployment Options:")
+        print("="*50)
+        print("\n1. Docker (Recommended)")
+        print("   - No dependency issues")
+        print("   - Works on all Linux distributions")
+        print("   - Easy to manage and update")
+        print("   - Automatic restart on failure")
+        print("\n2. Direct Installation")
+        print("   - Installs dependencies on your system")
+        print("   - May require troubleshooting")
+        print("   - Good for development")
+        
+        choice = input("\nChoose deployment method [1/2] (default: 1): ").strip()
+        
+        if choice == '2':
+            print("\n--- Direct Installation Mode ---")
+        else:
+            print("\n--- Docker Mode (Recommended) ---")
+            # First, configure settings
+            print("\nLet's configure your WOL Gateway settings first.\n")
+    else:
+        print("\n⚠ Docker not detected or not running.")
+        print("For the best experience, install Docker Desktop or start the Docker daemon.")
+        print("\nFalling back to direct installation mode...")
+        choice = '2'
     
     print("\n====================================")
     print("      Configuration Setup           ")
@@ -486,6 +626,45 @@ def main():
     except Exception as e:
         # Handle any file writing errors
         print(f"\n[ERROR] Could not save configuration: {e}")
+        return
+    
+    # Now handle deployment based on chosen method
+    if docker_available and choice != '2':
+        # Docker mode
+        print("\n" + "="*50)
+        if not setup_with_docker():
+            print("\n[WARNING] Docker setup failed.")
+            print("You can try running manually:")
+            print("  cd .docker && docker compose up -d")
+    else:
+        # Direct installation mode
+        print("\n" + "="*50)
+        print("      Installing Dependencies")
+        print("="*50)
+        print("\nThis script will check for required dependencies and install them if needed.")
+        print("You may be prompted for your sudo password to install system packages.\n")
+        
+        user_input = input("Continue with dependency check? [Y/n]: ").strip().lower()
+        if user_input and user_input not in ('y', 'yes'):
+            print("Setup complete. Configuration saved.")
+            print("Note: Dependencies were not installed. Run './start.sh' when ready.")
+            return
+        
+        # Install dependencies
+        if not install_dependencies():
+            print("\n[WARNING] Some dependencies could not be installed automatically.")
+            print("The configuration has been saved, but you may need to install dependencies manually.")
+            print("\nYou can:")
+            print("  1. Fix dependencies and run: ./start.sh")
+            print("  2. Try Docker: cd .docker && docker compose up -d")
+        else:
+            print("\n" + "="*50)
+            print("  ✓ Setup Complete!")
+            print("="*50)
+            print("\nTo start the WOL Gateway, run:")
+            print("  ./start.sh")
+            print("\nOr run manually:")
+            print("  sudo python3 wol_gatway.py")
 
 if __name__ == "__main__":
     main()

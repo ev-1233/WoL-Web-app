@@ -1,18 +1,15 @@
-version: '3.8'
-
 services:
   wol-gateway:
-    build: .
+    build: 
+      context: ..
+      dockerfile: .docker/Dockerfile
     container_name: wol-gateway
     # Map container port to host port (host:container)
-    # The container uses port from config, host uses 500
     ports:
       - "500:500"
-    # Use host network mode to allow sending WOL packets on local network
-    network_mode: host
     # Mount config file so you can update it without rebuilding
     volumes:
-      - ./WOL_Brige.config:/app/WOL_Brige.config:ro
+      - ../WOL_Brige.config:/app/WOL_Brige.config:ro
     restart: unless-stopped
     # Optional: Set timezone
     environment:

@@ -4,20 +4,23 @@
 
 ### 1. Build and Run with Docker Compose (Recommended)
 ```bash
+# Navigate to the .docker folder
+cd .docker
+
 # Build and start the container
-docker-compose up -d
+docker compose up -d
 
 # View logs
-docker-compose logs -f
+docker compose logs -f
 
 # Stop the container
-docker-compose down
+docker compose down
 ```
 
 ### 2. Build and Run with Docker directly
 ```bash
-# Build the image
-docker build -t wol-gateway .
+# Build the image from project root
+docker build -f .docker/Dockerfile -t wol-gateway .
 
 # Run the container
 docker run -d --name wol-gateway --network host wol-gateway
@@ -31,10 +34,11 @@ docker stop wol-gateway && docker rm wol-gateway
 
 ## Updating Configuration
 
-After changing `WOL_Brige.config`:
+After changing `WOL_Brige.config` in the project root:
 ```bash
-# With docker-compose
-docker-compose restart
+# With docker-compose (from .docker folder)
+cd .docker
+docker compose restart
 
 # With docker
 docker restart wol-gateway
@@ -64,10 +68,12 @@ docker ps
 
 ### View container logs:
 ```bash
-docker-compose logs -f
+cd .docker
+docker compose logs -f
 ```
 
 ### Rebuild after code changes:
 ```bash
-docker-compose up -d --build
+cd .docker
+docker compose up -d --build
 ```

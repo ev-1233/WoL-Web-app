@@ -19,11 +19,10 @@ COPY WOL_Brige.config .
 # Expose the port (will be configurable via config file)
 EXPOSE 500
 
-# Run as non-root user for security (but Docker will handle port mapping)
-RUN useradd -m -u 1000 woluser && \
-    chown -R woluser:woluser /app
-
-USER woluser
+# Note: Running as root because we're using host networking and need to bind to privileged ports
+# If you change to a port >= 1024, you can uncomment the lines below to run as non-root
+# RUN useradd -m -u 1000 woluser && chown -R woluser:woluser /app
+# USER woluser
 
 # Start the application
 CMD ["python3", "wol_gatway.py"]
