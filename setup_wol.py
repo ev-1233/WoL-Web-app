@@ -24,8 +24,77 @@ import sys
 import platform
 import socket
 
+try:
+    from version import __version__, __github_repo__
+except ImportError:
+    __version__ = "1.0.0"
+    __github_repo__ = "yourusername/wol-gateway"
+
 # Configuration file path - must match the one used by wol_gatway.py
 CONFIG_FILE = "WOL_Brige.config"
+
+def is_running_in_docker():
+    """
+    Detect if the script is running inside a Docker container.
+    
+    Returns:
+        bool: True if running in Docker, False otherwise
+    """
+    # Check for .dockerenv file (most common indicator)
+    if os.path.exists('/.dockerenv'):
+        return True
+    
+    # Check cgroup for docker
+    try:
+        with open('/proc/1/cgroup', 'r') as f:
+            return 'docker' in f.read() or 'containerd' in f.read()
+    except:
+        pass
+    
+    # Check for container environment variable
+    if os.environ.get('CONTAINER') or os.environ.get('DOCKER_CONTAINER'):
+        return True
+    
+    return False
+
+def check_for_updates():
+    """
+    Check if a newer version is available on GitHub.
+    Displays a message if an update is found, but doesn't auto-update.
+    
+    Returns:
+        bool: True if update is available, False otherwise
+    """
+    try:
+        import urllib.request
+        import json as json_lib
+        
+        # GitHub API endpoint for latest release
+        api_url = f"https://api.github.com/repos/{__github_repo__}/releases/latest"
+        
+        # Set a short timeout to avoid hanging
+        req = urllib.request.Request(api_url)
+        req.add_header('User-Agent', 'WOL-Gateway-Update-Checker')
+        
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json_lib.loads(response.read().decode())
+            latest_version = data['tag_name'].lstrip('v')
+            
+            # Compare versions (simple string comparison works for semantic versioning)
+            if latest_version != __version__:
+                print("\n" + "="*60)
+                print("🔔  UPDATE AVAILABLE!")
+                print("="*60)
+                print(f"  Current version: {__version__}")
+                print(f"  Latest version:  {latest_version}")
+                print(f"\n  Download: https://github.com/{__github_repo__}/releases/latest")
+                print("="*60 + "\n")
+                return True
+    except Exception as e:
+        # Silently fail - don't interrupt setup if update check fails
+        pass
+    
+    return False
 
 def detect_linux_distro():
     """
@@ -123,6 +192,15 @@ def install_dependencies():
     Returns:
         bool: True if all dependencies are satisfied, False if installation failed
     """
+    # Skip dependency installation if running inside Docker - everything is pre-installed
+    if is_running_in_docker():
+        print("\n" + "="*50)
+        print("      Running in Docker Container")
+        print("="*50)
+        print("✓ Dependencies pre-installed in container")
+        print("="*50 + "\n")
+        return True
+    
     print("\n" + "="*50)
     print("      Checking Dependencies")
     print("="*50)
@@ -750,15 +828,28 @@ def setup_with_docker():
 def main():
     print("====================================")
     print("      WOL Bridge Setup Script       ")
+    print(f"      Version {__version__}              ")
     print("====================================")
     
-    # Check Docker status
-    docker_installed = check_docker_installed()
-    docker_running = check_docker_running()
-    docker_available = docker_installed and docker_running
+    # Check for updates (only if not running in Docker)
+    if not is_running_in_docker():
+        check_for_updates()
     
-    # Handle Docker installation/startup prompts
-    if not docker_installed:
+    # Skip Docker installation/management when running inside Docker
+    if is_running_in_docker():
+        print("\n✓ Running inside Docker container")
+        print("  Skipping Docker installation steps...")
+        docker_available = False
+        docker_installed = False
+        docker_running = False
+    else:
+        # Check Docker status
+        docker_installed = check_docker_installed()
+        docker_running = check_docker_running()
+        docker_available = docker_installed and docker_running
+    
+    # Handle Docker installation/startup prompts (only if NOT in Docker)
+    if not is_running_in_docker() and not docker_installed:
         print("\n⚠ Docker is not installed.")
         print("\nDocker provides the easiest deployment method with:")
         print("  - No dependency issues")
@@ -791,7 +882,7 @@ def main():
                                     docker_available = True
                                     docker_running = True
                                     break
-                                else:
+                                else:#
                                     print("\n⚠ Failed to start Docker.")
                                     print("\nPossible solutions:")
                                     print("  1. Reboot your system (some Docker installations require a reboot)")
