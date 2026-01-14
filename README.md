@@ -1,6 +1,6 @@
 # WOL Gateway
 
-Wake-on-LAN gateway service that provides a simple web interface to wake up your servers remotely form anywhere without a vpn.
+Wake-on-LAN gateway service that provides a simple web interface to wake up your servers remotely from anywhere without a vpn.
 
 ## Features
 
@@ -49,7 +49,7 @@ The setup script will:
 
 If you just love git that much:
 
-**python3 and pip must be installed and we highly recomend you install docker(technically optional):**
+**python3 and pip must be installed and we highly recommend you install docker(technically optional):**
 
 - python3 [install guide](https://pythongeeks.org/python-3-installation-and-setup-guide/ "by pythongeeks.org")
 - Pip [install guide](https://pip.pypa.io/en/stable/installation/ "from pip themselves")
@@ -174,4 +174,8 @@ python -m venv venv
 pip install flask wakeonlan
 python wol_gatway.py
 ```
+
+for more info see 
+[the deployment guide][DEPLOYMENT.md]
+
 on VScode you can run the gateway with out the setup script by pressing **ctrl+shift+b**

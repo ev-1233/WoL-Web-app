@@ -5,7 +5,7 @@
 This project supports 3 distribution methods:
 1. **Docker Image** - Automated builds pushed to Docker Hub
 2. **Standalone Executables** - PyInstaller binaries for Linux, Windows, and macOS
-3. **git soucre code** - For people how ned to tweak code
+3. **git source code** - For people who need to tweak code
 
 Both are automatically built and released via GitHub Actions when you push a version tag.
 
