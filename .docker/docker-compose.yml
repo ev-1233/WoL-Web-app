@@ -11,10 +11,13 @@ services:
     # Map container port to host port
     ports:
       - "5000:5000"
-    # Mount config files so you can update them without rebuilding
+    # Mount config files and source code for live updates during development
     volumes:
       - ../WOL_Brige.config:/app/WOL_Brige.config
       - ../admin_config.json:/app/admin_config.json
+      - ../wol_gatway.py:/app/wol_gatway.py
+      - ../admin_panel.py:/app/admin_panel.py
+      - ../version.py:/app/version.py
     restart: unless-stopped
     # Optional: Set timezone
     environment:

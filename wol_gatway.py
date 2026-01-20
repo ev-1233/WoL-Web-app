@@ -467,4 +467,6 @@ if __name__ == '__main__':
         print(f"[{time.strftime('%H:%M:%S')}]   {idx}. {server['NAME']} - MAC: {server['WOL_MAC_ADDRESS']}")
     print(f"[{time.strftime('%H:%M:%S')}] Access the root page to see all servers")
     
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    # debug=True enables auto-reload when code changes
+    # Set to False in production
+    app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=True)
