@@ -374,24 +374,86 @@ def home():
 <html>
 <head>
     <title>Server Gateway</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
-        body {{ font-family: sans-serif; text-align: center; margin-top: 50px; background-color: #f0f0f0; }}
-        .container {{ background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); display: inline-block; min-width: 400px; }}
-        h1 {{ color: #333; margin-bottom: 30px; }}
+        :root {{
+            --bg-color: #f0f0f0;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --heading-color: #2c3e50;
+            --button-bg: #3498db;
+            --button-hover: #2980b9;
+            --admin-button-bg: #9b59b6;
+            --admin-button-hover: #8e44ad;
+            --border-color: #e0e0e0;
+            --server-card-bg: #f9f9f9;
+            --shadow: rgba(0,0,0,0.1);
+        }}
+        [data-theme="dark"] {{
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --heading-color: #e0e0e0;
+            --button-bg: #3498db;
+            --button-hover: #2980b9;
+            --admin-button-bg: #9b59b6;
+            --admin-button-hover: #8e44ad;
+            --border-color: #404040;
+            --server-card-bg: #3d3d3d;
+            --shadow: rgba(0,0,0,0.3);
+        }}
+        body {{ 
+            font-family: sans-serif; 
+            text-align: center; 
+            margin-top: 50px; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        .theme-toggle {{
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            z-index: 1000;
+            color: var(--text-color);
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }}
+        .theme-toggle:hover {{
+            opacity: 1;
+        }}
+        .container {{ 
+            background: var(--card-bg); 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 8px var(--shadow); 
+            display: inline-block; 
+            min-width: 400px;
+            transition: background-color 0.3s;
+        }}
+        h1 {{ 
+            color: var(--heading-color); 
+            margin-bottom: 30px;
+        }}
         .server-card {{ 
-            background: #f9f9f9; 
+            background: var(--server-card-bg); 
             padding: 20px; 
             margin: 15px 0; 
             border-radius: 8px; 
-            border: 1px solid #e0e0e0;
+            border: 1px solid var(--border-color);
+            transition: background-color 0.3s;
         }}
         .server-card h2 {{ 
-            color: #2c3e50; 
+            color: var(--heading-color); 
             margin: 0 0 15px 0; 
             font-size: 20px; 
         }}
         .button {{ 
-            background-color: #3498db; 
+            background-color: var(--button-bg); 
             color: white; 
             padding: 12px 28px; 
             text-align: center; 
@@ -404,35 +466,56 @@ def home():
             border-radius: 5px;
             transition: background-color 0.3s;
         }}
-        .button:hover {{ background-color: #2980b9; }}
+        .button:hover {{ background-color: var(--button-hover); }}
         .button.admin {{ 
-            background-color: #9b59b6; 
+            background-color: var(--admin-button-bg); 
             margin-top: 20px;
         }}
-        .button.admin:hover {{ background-color: #8e44ad; }}
+        .button.admin:hover {{ background-color: var(--admin-button-hover); }}
         .server-info {{ 
-            color: #666; 
+            color: var(--text-color); 
             font-size: 13px; 
-            margin: 10px 0 0 0; 
+            margin: 10px 0 0 0;
+            opacity: 0.7;
         }}
         .footer {{ 
-            color: #999; 
+            color: var(--text-color); 
             font-size: 12px; 
-            margin-top: 30px; 
+            margin-top: 30px;
+            opacity: 0.6;
         }}
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
     <div class="container">
         <h1>🖥️ Server Gateway</h1>
         {server_buttons_html}
-        <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+        <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-color);">
             <a href="/admin" class="button admin">⚙️ Admin Panel</a>
         </div>
         <p class="footer">
             {len(SERVERS)} server{'s' if len(SERVERS) != 1 else ''} configured
         </p>
     </div>
+    <script>
+        function toggleTheme() {{
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon();
+        }}
+        function updateThemeIcon() {{
+            const theme = document.documentElement.getAttribute('data-theme');
+            const toggle = document.querySelector('.theme-toggle i');
+            toggle.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }}
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeIcon();
+    </script>
 </body>
 </html>
     """
@@ -458,15 +541,18 @@ if __name__ == '__main__':
     # host='0.0.0.0' - Binds to all network interfaces (allows external connections)
     #                  Change to '127.0.0.1' if only local access is needed
     # port=PORT - Uses the port specified in the config file
-    # debug=False - Disables debug mode for production use
-    #               Set to True during development for auto-reload and detailed errors
+    # debug - Controlled by FLASK_ENV environment variable
+    #         Only enables if FLASK_ENV=development
+    #         Defaults to False (production-safe)
+    
+    # Check environment variable for debug mode (safe default)
+    debug_mode = os.environ.get('FLASK_ENV') == 'development'
     
     print(f"[{time.strftime('%H:%M:%S')}] Flask App starting on http://0.0.0.0:{PORT}")
+    print(f"[{time.strftime('%H:%M:%S')}] Debug mode: {debug_mode}")
     print(f"[{time.strftime('%H:%M:%S')}] Configured {len(SERVERS)} server(s):")
     for idx, server in enumerate(SERVERS):
         print(f"[{time.strftime('%H:%M:%S')}]   {idx}. {server['NAME']} - MAC: {server['WOL_MAC_ADDRESS']}")
     print(f"[{time.strftime('%H:%M:%S')}] Access the root page to see all servers")
     
-    # debug=True enables auto-reload when code changes
-    # Set to False in production
-    app.run(host='0.0.0.0', port=PORT, debug=True, use_reloader=True)
+    app.run(host='0.0.0.0', port=PORT, debug=debug_mode, use_reloader=debug_mode)

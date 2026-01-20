@@ -548,16 +548,17 @@ LOGIN_TEMPLATE = '''
             position: relative;
         }
         .theme-toggle {
-            position: absolute;
+            position: fixed;
             top: 15px;
-            right: 15px;
+            left: 15px;
             background: none;
             border: none;
             font-size: 24px;
             cursor: pointer;
-            padding: 5px;
             opacity: 0.7;
             transition: opacity 0.2s;
+            z-index: 1000;
+            color: var(--text-color);
         }
         .theme-toggle:hover {
             opacity: 1;
@@ -625,8 +626,8 @@ LOGIN_TEMPLATE = '''
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
     <div class="login-container">
-        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
         <div class="lock-icon"><i class="fas fa-lock"></i></div>
         <h1>WOL Gateway Admin</h1>
         {% if error %}
@@ -682,27 +683,61 @@ DASHBOARD_TEMPLATE = '''
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333333;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --hover-bg: #f8f9fa;
+            --shadow: rgba(0,0,0,0.1);
+        }
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --card-bg: #2d2d2d;
+            --border-color: #404040;
+            --hover-bg: #3d3d3d;
+            --shadow: rgba(0,0,0,0.3);
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f5f5f5;
+            background: var(--bg-color);
+            color: var(--text-color);
             padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
         }
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
         .header {
-            background: white;
+            background: var(--card-bg);
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px var(--shadow);
             margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        h1 { color: #333; font-size: 24px; }
+        h1 { color: var(--text-color); font-size: 24px; }
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: none;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            z-index: 1000;
+            color: var(--text-color);
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        .theme-toggle:hover {
+            opacity: 1;
+        }
         .nav {
             display: flex;
             gap: 15px;
@@ -835,11 +870,11 @@ DASHBOARD_TEMPLATE = '''
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-cog"></i> Admin Dash</h1>
             <div class="nav">
-                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
                 <a href="{{ url_for('admin.manage_users') }}"><i class="fas fa-users"></i> Users</a>
                 <a href="{{ url_for('admin.security_settings') }}"><i class="fas fa-shield-alt"></i> Security</a>
                 <a href="/" target="_blank"><i class="fas fa-home"></i> Home</a>

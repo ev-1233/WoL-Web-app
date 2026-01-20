@@ -62,6 +62,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Prepare production docker-compose
+        run: |
+          # Remove development environment variable for production release
+          sed -i '/FLASK_ENV=development/d' .docker/docker-compose.yml
+          # Also remove volume mounts for source code (keep config files only)
+          sed -i '/wol_gatway.py/d' .docker/docker-compose.yml
+          sed -i '/admin_panel.py/d' .docker/docker-compose.yml
+          sed -i '/version.py/d' .docker/docker-compose.yml
+          echo "Production docker-compose.yml prepared"
+          cat .docker/docker-compose.yml
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       

@@ -22,3 +22,4 @@ services:
     # Optional: Set timezone
     environment:
       - TZ=America/New_York
+      - FLASK_ENV=development  # Remove this line or change to 'production' for releases
