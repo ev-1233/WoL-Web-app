@@ -1387,10 +1387,45 @@ def configure_servers_traditional(current_config, default_port,
             print("Error: Site URL cannot be empty.")
         
         # =================================================================
-        # 5. Prompt for Wait Time
+        # 5. Prompt for IP Address (optional, for TCP port check functionality)
         # =================================================================
+        print("\n--- Optional: Server IP Address ---")
+        print("If you provide an IP address, the gateway will check if a port is")
+        print("open until the server responds instead of waiting a fixed time.")
+        print("Leave blank to use time-based waiting instead.")
+        ip_address = input("Enter Server IP Address (optional): ").strip()
+        
+        # 5b. Prompt for Check Port if IP address is provided
+        # =================================================================
+        check_port = 22  # Default SSH port
+        if ip_address:
+            print("\n--- Optional: TCP Port to Check ---")
+            print("Which port should be checked to determine if the server is ready?")
+            print("Common ports: 22 (SSH), 80 (HTTP), 443 (HTTPS), 3389 (RDP)")
+            port_input = input("Enter Port Number [22]: ").strip()
+            if port_input:
+                try:
+                    check_port = int(port_input)
+                    if check_port <= 0 or check_port > 65535:
+                        print("Invalid port, using default 22")
+                        check_port = 22
+                except ValueError:
+                    print("Invalid port, using default 22")
+                    check_port = 22
+        
+        # =================================================================
+        # 6. Prompt for Wait Time (now serves as max timeout for port checks)
+        # =================================================================
+        if ip_address:
+            prompt_text = "Enter Maximum Wait Time in Seconds [60]: "
+            help_text = "(Maximum time to wait for server to respond)"
+        else:
+            prompt_text = "Enter Wait Time in Seconds [60]: "
+            help_text = "(Time to wait before redirecting)"
+        
+        print(help_text)
         while True:
-            wait_input = input("Enter Wait Time in Seconds [60]: ").strip()
+            wait_input = input(prompt_text).strip()
             if not wait_input:
                 wait = 60
                 break
@@ -1404,13 +1439,20 @@ def configure_servers_traditional(current_config, default_port,
                 print("Invalid input. Please enter a whole number.")
         
         # Add this server to the list
-        servers.append({
+        server_config = {
             "NAME": server_name,
             "WOL_MAC_ADDRESS": mac,
             "BROADCAST_ADDRESS": broadcast,
             "SITE_URL": url,
             "WAIT_TIME_SECONDS": wait
-        })
+        }
+        
+        # Only add IP address and port if provided
+        if ip_address:
+            server_config["IP_ADDRESS"] = ip_address
+            server_config["CHECK_PORT"] = check_port
+        
+        servers.append(server_config)
         
         print(f"\n✓ Server '{server_name}' added!")
         
@@ -1532,4 +1574,15 @@ def configure_servers_traditional(current_config, default_port,
             print("  sudo python3 wol_gatway.py")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n\n[Cancelled] Setup interrupted by user.")
+        print("You can run this script again anytime: python3 setup_wol.py")
+        sys.exit(0)
+    except EOFError:
+        print("\n\n[Error] Unexpected end of input. This can happen when:")
+        print("  - Running in a non-interactive environment")
+        print("  - Input stream is closed or redirected")
+        print("\nPlease run the setup in an interactive terminal.")
+        sys.exit(1)

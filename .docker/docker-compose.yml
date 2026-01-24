@@ -4,11 +4,11 @@ services:
       context: ..
       dockerfile: .docker/Dockerfile
     container_name: wol-gateway
-    # Use NET_ADMIN and NET_RAW capabilities to allow broadcast packets
-    cap_add:
-      - NET_ADMIN
-      - NET_RAW
-    # Map container port to host port
+    # Docker Desktop runs in a VM, so we use bridge mode with port mapping
+    # and add host.docker.internal to access the host network
+    network_mode: bridge
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5000:5000"
     # Mount config files and source code for live updates during development

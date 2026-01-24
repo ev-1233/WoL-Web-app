@@ -3,9 +3,9 @@
     "users": [
         {
             "username": "admin",
-            "password_hash": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+            "password_hash": "1306cdf41ee9380c236c193d0a5e0dbc24d7656a85f4959196a3d929555d03d9",
             "2fa_enabled": false,
-            "2fa_secret": "NYGBMJJQT2MGH6ZBHM7MOIKB7NN2KFZB"
+            "2fa_secret": "7INKJQKHGX46HYATGHVSEYKEP6PE45KK"
         }
     ]
 }

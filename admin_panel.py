@@ -191,6 +191,8 @@ def add_server():
         # Get locked status and PIN
         is_locked = request.form.get('locked') == 'on'
         pin = request.form.get('pin', '').strip()
+        ip_address = request.form.get('ip_address', '').strip()
+        check_port = request.form.get('check_port', '22').strip()
         
         # Create new server entry
         new_server = {
@@ -202,6 +204,14 @@ def add_server():
             "locked": is_locked,
             "pin": pin if is_locked else ""
         }
+        
+        # Only add IP address and port if provided
+        if ip_address:
+            new_server["IP_ADDRESS"] = ip_address
+            try:
+                new_server["CHECK_PORT"] = int(check_port)
+            except ValueError:
+                new_server["CHECK_PORT"] = 22
         
         # Add to servers list
         config['SERVERS'].append(new_server)
@@ -233,6 +243,8 @@ def edit_server(server_id):
         # Update server entry
         is_locked = request.form.get('locked') == 'on'
         pin = request.form.get('pin', '').strip()
+        ip_address = request.form.get('ip_address', '').strip()
+        check_port = request.form.get('check_port', '22').strip()
         
         servers[server_id] = {
             "NAME": request.form.get('name', '').strip(),
@@ -243,6 +255,14 @@ def edit_server(server_id):
             "locked": is_locked,
             "pin": pin if is_locked else ""
         }
+        
+        # Only add IP address and port if provided
+        if ip_address:
+            servers[server_id]["IP_ADDRESS"] = ip_address
+            try:
+                servers[server_id]["CHECK_PORT"] = int(check_port)
+            except ValueError:
+                servers[server_id]["CHECK_PORT"] = 22
         
         # Save config
         with open(CONFIG_FILE, 'w') as f:
@@ -1140,10 +1160,27 @@ SERVER_FORM_TEMPLATE = '''
                 </div>
                 
                 <div class="form-group">
-                    <label for="wait_time">Wait Time (seconds) *</label>
+                    <label for="ip_address">Server IP Address (Optional)</label>
+                    <input type="text" id="ip_address" name="ip_address"
+                           value="{{ server.IP_ADDRESS if server and server.IP_ADDRESS else '' }}"
+                           placeholder="192.168.1.100"
+                           pattern="^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$">
+                    <div class="help-text">If provided, the gateway will check this IP's port until the server responds (recommended)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="check_port">TCP Port to Check (Optional)</label>
+                    <input type="number" id="check_port" name="check_port" min="1" max="65535"
+                           value="{{ server.CHECK_PORT if server and server.CHECK_PORT else '22' }}"
+                           placeholder="22">
+                    <div class="help-text">Port to check when monitoring server startup (default: 22 for SSH, use 80/443 for web servers)</div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="wait_time">Maximum Wait Time (seconds) *</label>
                     <input type="number" id="wait_time" name="wait_time" required min="1"
                            value="{{ server.WAIT_TIME_SECONDS if server else '60' }}">
-                    <div class="help-text">How long to wait before redirecting (typically 30-120 seconds)</div>
+                    <div class="help-text">Maximum time to wait for server response (or fixed wait time if no IP provided)</div>
                 </div>
                 
                 <div class="form-group">

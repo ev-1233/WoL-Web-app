@@ -5,9 +5,9 @@ FROM python:3.11-slim
 # Set environment variable to indicate Docker environment
 ENV DOCKER_CONTAINER=true
 
-# Install system dependencies (wakeonlan and iproute2 for host network access)
+# Install system dependencies (wakeonlan, iproute2 for host network access, and iputils-ping for ping functionality)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends wakeonlan iproute2 && \
+    apt-get install -y --no-install-recommends wakeonlan iproute2 iputils-ping && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

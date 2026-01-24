@@ -13,7 +13,7 @@ Wake-on-LAN gateway service that provides a simple web interface to wake up your
 **Prerequisites:** Docker installed and running
 
 ```bash
-docker run -it --name wol-gateway \ --cap-add NET_ADMIN --cap-add NET_RAW \ --network host  \ --restart unless-stopped \ ev1233/wol-gateway:latest
+docker run -it --name wol-gateway --cap-add NET_ADMIN --cap-add NET_RAW --network host --restart unless-stopped ev1233/wol-gateway:latest
 ```
 
 The setup script will:

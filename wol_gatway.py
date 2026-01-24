@@ -24,6 +24,7 @@ import time
 import json
 import os
 import secrets
+import socket
 from datetime import datetime, timedelta
 from flask import Flask, redirect, Response, request, session
 
@@ -48,7 +49,7 @@ def load_config():
     Returns:
         dict: Validated configuration with keys: PORT, SERVERS (array)
               Each server has: NAME, WOL_MAC_ADDRESS, BROADCAST_ADDRESS, 
-              SITE_URL, WAIT_TIME_SECONDS
+              SITE_URL, WAIT_TIME_SECONDS (max timeout), IP_ADDRESS (optional)
     
     Raises:
         FileNotFoundError: If config file doesn't exist
@@ -73,11 +74,13 @@ def load_config():
         servers = user_config.get("SERVERS", [])
         
         if not servers or not isinstance(servers, list):
-            raise ValueError("SERVERS must be a non-empty array.")
+            raise ValueError(
+                "No servers configured. Please run 'python3 setup_wol.py' to configure at least one server."
+            )
         
         # Validate each server
         for idx, server in enumerate(servers):
-            required_keys = ("NAME", "WOL_MAC_ADDRESS", "BROADCAST_ADDRESS", "SITE_URL", "WAIT_TIME_SECONDS")
+            required_keys = ("NAME", "WOL_MAC_ADDRESS", "BROADCAST_ADDRESS", "SITE_URL")
             missing = [key for key in required_keys if key not in server]
             if missing:
                 raise ValueError(f"Server #{idx+1} missing required keys: {', '.join(missing)}")
@@ -92,18 +95,49 @@ def load_config():
             if not server["SITE_URL"].strip():
                 raise ValueError(f"Server #{idx+1}: SITE_URL must not be empty.")
             
-            try:
-                wait = int(server["WAIT_TIME_SECONDS"])
-                if wait <= 0:
-                    raise ValueError(f"Server #{idx+1}: WAIT_TIME_SECONDS must be greater than zero.")
-            except (TypeError, ValueError) as e:
-                raise ValueError(f"Server #{idx+1}: WAIT_TIME_SECONDS must be a positive integer.") from e
+            # Set default wait time if not provided (used as max timeout for pings)
+            if "WAIT_TIME_SECONDS" not in server:
+                server["WAIT_TIME_SECONDS"] = 60
+            else:
+                try:
+                    wait = int(server["WAIT_TIME_SECONDS"])
+                    if wait <= 0:
+                        raise ValueError(f"Server #{idx+1}: WAIT_TIME_SECONDS must be greater than zero.")
+                except (TypeError, ValueError) as e:
+                    raise ValueError(f"Server #{idx+1}: WAIT_TIME_SECONDS must be a positive integer.") from e
+            
+            # Validate IP address if provided (optional field for TCP port checking)
+            if "IP_ADDRESS" in server and server["IP_ADDRESS"]:
+                ip_addr = server["IP_ADDRESS"].strip()
+                if ip_addr:
+                    server["IP_ADDRESS"] = ip_addr
+                else:
+                    server["IP_ADDRESS"] = None
+            else:
+                server["IP_ADDRESS"] = None
+            
+            # Set default port for TCP port checking (SSH port 22)
+            if "CHECK_PORT" not in server:
+                server["CHECK_PORT"] = 22
+            else:
+                try:
+                    port = int(server["CHECK_PORT"])
+                    if port <= 0 or port > 65535:
+                        raise ValueError(f"Server #{idx+1}: CHECK_PORT must be between 1 and 65535.")
+                except (TypeError, ValueError) as e:
+                    raise ValueError(f"Server #{idx+1}: CHECK_PORT must be a valid port number.") from e
             
             # Set default values for optional fields (locked and pin)
             if "locked" not in server:
                 server["locked"] = False
             if "pin" not in server:
                 server["pin"] = ""
+            
+            # Initialize startup_times tracking (list of past startup durations)
+            if "startup_times" not in server:
+                server["startup_times"] = []
+            elif not isinstance(server["startup_times"], list):
+                server["startup_times"] = []
         
         # Extract and validate port number
         port_raw = user_config.get("PORT")
@@ -494,6 +528,194 @@ def generate_waiting_page(server_name, site_url, wait_time):
 </html>
 """
 
+def generate_ping_waiting_page(server_name, site_url, estimated_time, server_id):
+    """
+    Generates a waiting page that pings the server until it responds.
+    
+    Args:
+        server_name (str): Name of the server being woken
+        site_url (str): URL to redirect to when server is online
+        estimated_time (int): Estimated seconds based on historical average (0 if no history)
+        server_id (int): Server index for ping status endpoint
+    
+    Returns:
+        str: HTML content for the ping-based waiting page
+    """
+    return f"""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Starting {server_name}...</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        :root {{
+            --bg-color: #f0f0f0;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --heading-color: #2c3e50;
+            --server-name-color: #3498db;
+            --loader-bg: #f3f3f3;
+            --loader-top: #3498db;
+            --success-color: #27ae60;
+            --shadow: rgba(0,0,0,0.1);
+        }}
+        [data-theme="dark"] {{
+            --bg-color: #1a1a1a;
+            --card-bg: #2d2d2d;
+            --text-color: #e0e0e0;
+            --heading-color: #e0e0e0;
+            --server-name-color: #5dade2;
+            --loader-bg: #404040;
+            --loader-top: #3498db;
+            --success-color: #2ecc71;
+            --shadow: rgba(0,0,0,0.3);
+        }}
+        body {{ 
+            font-family: sans-serif; 
+            text-align: center; 
+            margin-top: 50px; 
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }}
+        .container {{ 
+            background: var(--card-bg); 
+            padding: 30px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 8px var(--shadow); 
+            display: inline-block;
+            min-width: 400px;
+            transition: background-color 0.3s;
+        }}
+        .start-icon {{
+            font-size: 48px;
+            color: var(--server-name-color);
+            margin-bottom: 20px;
+            transition: color 0.3s;
+        }}
+        .start-icon.success {{
+            color: var(--success-color);
+        }}
+        h1 {{ 
+            color: var(--heading-color); 
+            margin: 20px 0;
+        }}
+        .server-name {{ color: var(--server-name-color); }}
+        .loader {{ 
+            border: 8px solid var(--loader-bg); 
+            border-top: 8px solid var(--loader-top); 
+            border-radius: 50%; 
+            width: 50px; 
+            height: 50px; 
+            animation: spin 2s linear infinite; 
+            margin: 20px auto; 
+        }}
+        @keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}
+        p {{
+            color: var(--text-color);
+            line-height: 1.6;
+        }}
+        strong {{
+            color: var(--heading-color);
+        }}
+        .status {{
+            margin: 20px 0;
+            padding: 10px;
+            border-radius: 5px;
+            background: var(--loader-bg);
+        }}
+        .status.online {{
+            background: var(--success-color);
+            color: white;
+        }}
+        .progress {{
+            margin: 15px 0;
+            font-size: 14px;
+            color: var(--text-color);
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="start-icon" id="icon"><i class="fas fa-power-off"></i></div>
+        <h1>Starting <span class="server-name">{server_name}</span></h1>
+        <div class="loader" id="loader"></div>
+        <div class="status" id="status">Sending Wake-on-LAN signal...</div>
+        <p class="progress" id="progress">Waiting for server to respond...</p>
+        <p id="info">Pinging server every 2 seconds. {'Estimated time: <strong>' + str(estimated_time) + ' seconds</strong>' if estimated_time > 0 else 'No estimated time available yet'}.</p>
+    </div>
+    <script>
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        const estimatedTime = {estimated_time};
+        const serverId = {server_id};
+        const siteUrl = "{site_url}";
+        let elapsedTime = 0;
+        let pingInterval;
+        let hasLoggedStartup = false;
+        
+        function updateStatus(message, isOnline = false) {{
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            if (isOnline) {{
+                statusEl.classList.add('online');
+                document.getElementById('icon').classList.add('success');
+                document.getElementById('icon').innerHTML = '<i class="fas fa-check-circle"></i>';
+                document.getElementById('loader').style.display = 'none';
+            }}
+        }}
+        
+        function updateProgress() {{
+            const progressEl = document.getElementById('progress');
+            if (estimatedTime > 0) {{
+                progressEl.textContent = `Time elapsed: ${{elapsedTime}}s (estimated: ${{estimatedTime}}s)`;
+            }} else {{
+                progressEl.textContent = `Time elapsed: ${{elapsedTime}}s`;
+            }}
+        }}
+        
+        function checkServerStatus() {{
+            fetch(`/ping_status/${{serverId}}?elapsed=${{elapsedTime}}`)
+                .then(response => response.json())
+                .then(data => {{
+                    if (data.online) {{
+                        // Server is online!
+                        clearInterval(pingInterval);
+                        updateStatus('Server is online! Redirecting...', true);
+                        setTimeout(() => {{
+                            window.location.href = data.redirect_url;
+                        }}, 1500);
+                    }} else if (data.no_ip) {{
+                        // No IP configured, shouldn't happen but fallback anyway
+                        clearInterval(pingInterval);
+                        updateStatus('Redirecting...');
+                        setTimeout(() => {{
+                            window.location.href = data.redirect_url;
+                        }}, 2000);
+                    }} else {{
+                        elapsedTime += 2;
+                        updateProgress();
+                    }}
+                }})
+                .catch(error => {{
+                    console.error('Ping check failed:', error);
+                    elapsedTime += 2;
+                    updateProgress();
+                }});
+        }}
+        
+        // Start checking immediately
+        updateProgress();
+        checkServerStatus();
+        
+        // Then check every 2 seconds
+        pingInterval = setInterval(checkServerStatus, 2000);
+    </script>
+</body>
+</html>
+"""
+
 def find_wakeonlan_command():
     """
     Finds the wakeonlan command in various possible locations.
@@ -540,6 +762,105 @@ def find_wakeonlan_command():
     
     return None
 
+def log_startup_time(server_id, startup_seconds):
+    """
+    Logs a server's startup time and updates the config file with rolling average.
+    Keeps last 10 startup times for calculating average.
+    
+    Args:
+        server_id (int): Server index
+        startup_seconds (int): Time in seconds it took for server to respond
+    """
+    try:
+        # Load current config
+        with open(CONFIG_FILE, 'r') as f:
+            config = json.load(f)
+        
+        servers = config.get('SERVERS', [])
+        if server_id < 0 or server_id >= len(servers):
+            return
+        
+        server = servers[server_id]
+        
+        # Initialize or get existing startup times
+        if 'startup_times' not in server:
+            server['startup_times'] = []
+        
+        # Add new time
+        server['startup_times'].append(startup_seconds)
+        
+        # Keep only last 10 entries
+        if len(server['startup_times']) > 10:
+            server['startup_times'] = server['startup_times'][-10:]
+        
+        # Calculate average
+        avg_time = sum(server['startup_times']) // len(server['startup_times'])
+        
+        # Save updated config
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(config, f, indent=4)
+        
+        print(f"[{time.strftime('%H:%M:%S')}] Server '{server['NAME']}' startup time: {startup_seconds}s (avg: {avg_time}s)")
+        
+        # Update the in-memory SERVERS list
+        SERVERS[server_id]['startup_times'] = server['startup_times']
+        
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] Error logging startup time: {e}")
+
+@app.route('/ping_status/<server_id>')
+def ping_status(server_id):
+    """
+    Endpoint to check if a server is responding via TCP port check.
+    Returns JSON with status and logs startup time when server comes online.
+    
+    Args:
+        server_id (str): The index (0-based) of the server to check
+    
+    Returns:
+        JSON: {"online": true/false, "redirect_url": "...", "startup_time": seconds}
+    """
+    try:
+        idx = int(server_id)
+        if idx < 0 or idx >= len(SERVERS):
+            return {"error": "Invalid server ID"}, 400
+    except ValueError:
+        return {"error": "Server ID must be a number"}, 400
+    
+    server = SERVERS[idx]
+    ip_address = server.get("IP_ADDRESS")
+    check_port = server.get("CHECK_PORT", 22)
+    site_url = server["SITE_URL"]
+    
+    # Ensure site_url has a proper scheme
+    if not site_url.startswith(('http://', 'https://')):
+        site_url = 'http://' + site_url
+    
+    if not ip_address:
+        # No IP configured, can't check port
+        return {"online": False, "no_ip": True, "redirect_url": site_url}
+    
+    # Check if port is open (TCP connection test)
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
+        result = sock.connect_ex((ip_address, check_port))
+        sock.close()
+        
+        online = (result == 0)
+        
+        # If server just came online, check if we should log the startup time
+        if online:
+            startup_time = request.args.get('elapsed', type=int)
+            if startup_time:
+                # Log this startup time
+                log_startup_time(idx, startup_time)
+        
+        return {"online": online, "redirect_url": site_url}
+    except Exception as e:
+        print(f"[{time.strftime('%H:%M:%S')}] Port check error for {ip_address}:{check_port}: {e}")
+        return {"online": False, "error": str(e), "redirect_url": site_url}
+
 @app.route('/wake/<server_id>', methods=['GET', 'POST'])
 def wake_server_and_redirect(server_id):
     """
@@ -572,6 +893,11 @@ def wake_server_and_redirect(server_id):
     mac_address = server["WOL_MAC_ADDRESS"]
     broadcast_address = server["BROADCAST_ADDRESS"]
     site_url = server["SITE_URL"]
+    
+    # Ensure site_url has a proper scheme (http:// or https://)
+    if not site_url.startswith(('http://', 'https://')):
+        site_url = 'http://' + site_url
+    
     wait_time = server["WAIT_TIME_SECONDS"]
     is_locked = server.get("locked", False)
     server_pin = server.get("pin", "")
@@ -641,9 +967,20 @@ def wake_server_and_redirect(server_id):
     # =================================================================
     # Step 2: Return the HTML Waiting Page
     # =================================================================
-    # The HTML page contains a meta refresh tag that will automatically
-    # redirect the user's browser to site_url after wait_time seconds
-    return Response(generate_waiting_page(server_name, site_url, wait_time), mimetype='text/html')
+    ip_address = server.get("IP_ADDRESS")
+    
+    if ip_address:
+        # Use ping-based waiting page that actively checks if server is online
+        # Calculate estimated time from historical data
+        startup_times = server.get("startup_times", [])
+        if startup_times:
+            estimated_time = sum(startup_times) // len(startup_times)
+        else:
+            estimated_time = 0  # No history yet
+        return Response(generate_ping_waiting_page(server_name, site_url, estimated_time, idx), mimetype='text/html')
+    else:
+        # Use traditional time-based waiting page
+        return Response(generate_waiting_page(server_name, site_url, wait_time), mimetype='text/html')
 
 @app.route('/')
 def home():
