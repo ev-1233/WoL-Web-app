@@ -1682,28 +1682,78 @@ USER_MANAGEMENT_TEMPLATE = '''
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333333;
+            --card-bg: #ffffff;
+            --border-color: #e0e0e0;
+            --input-bg: #ffffff;
+            --hover-bg: #f8f9fa;
+            --shadow: rgba(0,0,0,0.1);
+            --header-bg: #ffffff;
+            --badge-success-bg: #d4edda;
+            --badge-success-color: #155724;
+            --badge-secondary-bg: #e2e3e5;
+            --badge-secondary-color: #383d41;
+        }
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #e0e0e0;
+            --card-bg: #2d2d2d;
+            --border-color: #404040;
+            --input-bg: #3d3d3d;
+            --hover-bg: #3d3d3d;
+            --shadow: rgba(0,0,0,0.3);
+            --header-bg: #2d2d2d;
+            --badge-success-bg: #1e4620;
+            --badge-success-color: #85e089;
+            --badge-secondary-bg: #3d3d3d;
+            --badge-secondary-color: #b0b0b0;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: var(--bg-color);
+            color: var(--text-color);
             min-height: 100vh;
             padding: 20px;
+            transition: background-color 0.3s, color 0.3s;
         }
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
+        .theme-toggle {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            color: var(--text-color);
+        }
+        .theme-toggle:hover {
+            opacity: 1;
+        }
         .header {
-            background: white;
+            background: var(--header-bg);
             padding: 20px;
             border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px var(--shadow);
             margin-bottom: 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            transition: background-color 0.3s;
         }
-        h1 { color: #333; font-size: 24px; }
+        h1 { 
+            color: var(--text-color); 
+            font-size: 24px; 
+        }
         .nav {
             display: flex;
             gap: 15px;
@@ -1726,6 +1776,7 @@ USER_MANAGEMENT_TEMPLATE = '''
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 2px 10px var(--shadow);
+            transition: background-color 0.3s;
         }
         h2 {
             color: var(--text-color);
@@ -1776,12 +1827,12 @@ USER_MANAGEMENT_TEMPLATE = '''
             font-weight: 600;
         }
         .badge-success {
-            background: #d4edda;
-            color: #155724;
+            background: var(--badge-success-bg);
+            color: var(--badge-success-color);
         }
         .badge-secondary {
-            background: #e2e3e5;
-            color: #383d41;
+            background: var(--badge-secondary-bg);
+            color: var(--badge-secondary-color);
         }
         .actions {
             display: flex;
@@ -1823,6 +1874,7 @@ USER_MANAGEMENT_TEMPLATE = '''
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-users"></i> User Management</h1>
@@ -1892,8 +1944,22 @@ USER_MANAGEMENT_TEMPLATE = '''
         </div>
     </div>
     <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            const toggle = document.querySelector('.theme-toggle i');
+            toggle.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeIcon();
     </script>
 </body>
 </html>
@@ -2007,13 +2073,31 @@ USER_FORM_TEMPLATE = '''
             text-decoration: none;
         }
         .note {
-            color: #666;
+            color: var(--text-color);
+            opacity: 0.7;
             font-size: 13px;
             margin-top: 5px;
+        }
+        .theme-toggle {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+            z-index: 1000;
+            color: var(--text-color);
+        }
+        .theme-toggle:hover {
+            opacity: 1;
         }
     </style>
 </head>
 <body>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"><i class="fas fa-moon"></i></button>
     <div class="container">
         <div class="card">
             <h1>{{ action }} Admin User</h1>
@@ -2066,8 +2150,22 @@ USER_FORM_TEMPLATE = '''
         </div>
     </div>
     <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon();
+        }
+        function updateThemeIcon() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            const toggle = document.querySelector('.theme-toggle i');
+            toggle.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        }
         const savedTheme = localStorage.getItem('theme') || 'light';
         document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeIcon();
     </script>
 </body>
 </html>
